@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark">
+  <title>OpenCode Chat Flutuante — Configurações</title>
+  <style>
+    :root {
+      --bg: #0e1014; --panel: #171a20; --panel2: #1d212a;
+      --line: #262b34; --line2: #333944;
+      --text: #e7eaf0; --dim: #9aa2b1; --dim2: #6f7889;
+      --accent: #3b82f6; --ok: #22c55e; --err: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font: 14px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: 32px 20px 60px;
+    }
+    main { max-width: 660px; margin: 0 auto; }
+    h1 { font-size: 19px; margin-bottom: 4px; }
+    .sub { color: var(--dim2); font-size: 13px; margin-bottom: 26px; }
+    section {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 10px; padding: 16px; margin-bottom: 14px;
+    }
+    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+         color: var(--dim); margin-bottom: 12px; font-weight: 600; }
+    .row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .row:last-child { margin-bottom: 0; }
+    label { font-size: 12.5px; color: var(--dim); }
+    .hint { font-size: 11.5px; color: var(--dim2); }
+    input[type=text], input[type=password], select {
+      padding: 8px 10px; background: var(--bg);
+      border: 1px solid var(--line); border-radius: 7px;
+      color: var(--text); font: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .inline { display: flex; gap: 8px; align-items: center; }
+    .inline input { flex: 1; }
+    .inline input[type=number] { max-width: 92px; }
+    label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13.5px; cursor: pointer; }
+    button {
+      padding: 8px 14px; background: var(--panel2);
+      border: 1px solid var(--line2); border-radius: 7px;
+      color: var(--text); font: inherit; cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .status { padding: 9px 12px; border-radius: 7px; font-size: 13px; margin-bottom: 14px; }
+    .status.ok { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); }
+    .status.err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); }
+    code { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px;
+           padding: 1px 5px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+    pre { background: #0b0d11; border: 1px solid var(--line); border-radius: 7px;
+          padding: 10px 12px; overflow-x: auto; font-size: 12px; margin: 8px 0 0;
+          font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--dim); }
+    .actions { display: flex; gap: 8px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>OpenCode Chat Flutuante</h1>
+  <p class="sub">Chat com seus modelos do OpenCode direto no navegador, com menu de pre-prompts na seleção e as suas skills como base.</p>
+
+  <div id="status" class="status" hidden></div>
+
+  <section>
+    <h2>Servidor OpenCode</h2>
+    <div class="row">
+      <label for="host">Endereço</label>
+      <input id="host" type="text" value="127.0.0.1">
+      <span class="hint">Normalmente 127.0.0.1. Não use host remoto.</span>
+    </div>
+    <div class="row">
+      <label for="port">Porta</label>
+      <input id="port" type="number" value="4177">
+      <span class="hint">A porta que você passou em <code>opencode serve --port</code>.</span>
+    </div>
+    <div class="row">
+      <label for="password">Senha do servidor</label>
+      <input id="password" type="password" value="testefixo123">
+      <span class="hint">Definida por <code>OPENCODE_SERVER_PASSWORD</code> ao iniciar o servidor. Guardada só neste navegador.</span>
+    </div>
+    <div class="row">
+      <label for="directory">Pasta de trabalho</label>
+      <input id="directory" type="text">
+      <span class="hint">As sessões do chat ficam vinculadas a esta pasta. Não precisa existir.</span>
+    </div>
+    <div class="actions">
+      <button id="test" class="primary">Testar conexão</button>
+      <button id="save">Salvar</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Modelo padrao</h2>
+    <div class="row">
+      <label for="modelSearch">Modelo</label>
+      <input id="modelSearch" type="text" placeholder="Filtrar por nome ou provedor (ex.: step, k4, gigante)" autocomplete="off">
+      <div id="modelList" class="mlist" role="listbox" aria-label="Modelos disponiveis" tabindex="0"></div>
+      <span class="hint" id="modelCount"></span>
+    </div>
+
+    <div class="row">
+      <label for="effort">Effort (nivel de raciocinio)</label>
+      <select id="effort">
+        <option value="">padrao do modelo</option>
+      </select>
+      <span class="hint">O quanto o modelo pensa antes de responder. Mais alto = resposta melhor e mais lenta. O que estiver marcado aqui vale para toda conversa nova.</span>
+    </div>
+
+    <div class="row">
+      <label class="check"><input id="modelVision" type="checkbox" disabled> Este modelo enxerga imagem</label>
+      <span class="hint">Sem visao o botao <code>ver tela</code> fica desabilitado no painel.</span>
+    </div>
+
+    <div class="row">
+      <span class="hint" id="currentModel"></span>
+    </div>
+
+    <div class="actions">
+      <button id="saveModel" class="primary">Salvar modelo</button>
+      <button id="reloadModels">Recarregar lista</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Modelo de visao</h2>
+    <div class="row">
+      <label class="check"><input id="sameVision" type="checkbox"> Usar o mesmo modelo de texto</label>
+      <span class="hint">Marcado: a imagem anexada vai direto para o modelo de texto &mdash; ele precisa enxergar imagem. Desmarcado: entra em cena um segundo modelo so para a visao.</span>
+    </div>
+
+    <div id="visionGroup">
+      <div class="row">
+        <label for="visionSearch">Modelo que enxerga</label>
+        <input id="visionSearch" type="text" placeholder="Filtrar (so modelos com visao aparecem)" autocomplete="off">
+        <div id="visionList" class="mlist" role="listbox" aria-label="Modelos com visao" tabindex="0"></div>
+        <span class="hint" id="visionCount"></span>
+      </div>
+
+      <div class="row">
+        <label for="visionEffort">Effort do modelo de visao</label>
+        <select id="visionEffort">
+          <option value="">padrao do modelo</option>
+        </select>
+        <span class="hint">Baixo costuma bastar: aqui a tarefa &eacute; descrever o que esta na tela, nao raciocinar sobre isso.</span>
+      </div>
+
+      <div class="row">
+        <label class="check"><input id="visionVision" type="checkbox" disabled> Este modelo enxerga imagem</label>
+      </div>
+
+      <div class="row">
+        <span class="hint" id="currentvision"></span>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="hint"><strong>Como funciona a diferenca:</strong> com um modelo so, voce manda a imagem e ele responde. Com dois, a imagem vai primeiro para o que enxerga, que devolve uma descricao; essa descricao entra como contexto no prompt do modelo de texto, que responde sem nunca ver a imagem. Util quando o modelo que voce prefere para conversar nao tem visao &mdash; e tambem quando o de visao e melhor descrevendo do que raciocinando.</span>
+    </div>
+
+    <div class="actions">
+      <button id="saveVision" class="primary">Salvar visao</button>
+    </div>
+  </section>
+
+  <style>
+    /* lista de modelos: rolagem propria, destaque no item selecionado */
+    .mlist {
+      max-height: 260px; overflow-y: auto;
+      background: var(--bg); border: 1px solid var(--line); border-radius: 7px;
+      padding: 4px; margin-top: 2px;
+    }
+    .mlist:focus { outline: none; border-color: var(--accent); }
+    .mitem {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 9px; border-radius: 6px; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .mitem:hover { background: var(--panel2); }
+    .mitem.sel { background: rgba(59,130,246,.14); border-color: var(--accent); }
+    .mitem .nm { font-size: 13px; color: var(--text); flex: 1 1 auto; }
+    .mitem .pv { font-size: 11px; color: var(--dim2); font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .mitem .eye { font-size: 11px; color: var(--ok); }
+    .mlist .none { padding: 14px; text-align: center; color: var(--dim2); font-size: 12.5px; }
+    .mkey { display: inline-block; min-width: 15px; text-align: center; color: var(--dim2); font-size: 12px; }
+    /* grupo de visao desligado fica apagado, nao escondido: da para ver que
+       existe sem o controle parecer sumido */
+    #visionGroup.off { opacity: .38; pointer-events: none; }
+  </style>
+  <section>
+    <h2>Comportamento</h2>
+    <div class="row">
+      <label class="check"><input id="showBubble" type="checkbox"> Mostrar o botão flutuante na tela</label>
+      <span class="hint">Arraste para mover. Clique abre o chat. Duplo clique devolve ao canto.</span>
+    </div>
+    <div class="row">
+      <label class="check"><input id="selectionMenu" type="checkbox"> Menu de pre-prompts ao selecionar texto</label>
+    </div>
+    <div class="row">
+      <label class="check"><input id="imageMenu" type="checkbox"> Menu de pre-prompts com botão direito em imagem</label>
+    </div>
+    <div class="row">
+      <label class="check"><input id="preventImageContextMenu" type="checkbox"> Substituir o menu nativo do navegador ao clicar direito numa imagem</label>
+    </div>
+    <div class="row">
+      <label class="check"><input id="autoOpenOnPrompt" type="checkbox"> Abrir sessão nova a cada prompt vindo do menu</label>
+    </div>
+    <div class="actions"><button id="save2" class="primary">Salvar comportamento</button></div>
+  </section>
+
+  <section>
+    <h2>Instalar no Windows</h2>
+    <p class="hint" style="margin-bottom:6px">Rode o script <code>server\start.ps1</code> para subir o servidor com a senha acima. Depois carregue a pasta <code>extension</code> em brave://extensions → Modo de desenvolvedor → Carregar sem compactação.</p>
+    <pre>powershell -ExecutionPolicy Bypass -File server\start.ps1</pre>
+  </section>
+</main>
+
+<script src="lib/prompts.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

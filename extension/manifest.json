@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "OpenCode Chat Flutuante",
+  "version": "1.0.0",
+  "description": "Janela flutuante de chat com seus modelos do OpenCode, menu de pre-prompts ao selecionar texto ou imagem, e as suas skills como base.",
+  "minimum_chrome_version": "116",
+
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "OpenCode Chat Flutuante",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "options_page": "options.html",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["lib/prompts.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "panel.js", "panel.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": { "default": "Alt+Shift+O" },
+      "description": "Abrir/fechar o painel de chat"
+    },
+    "quick-explain": {
+      "description": "Explicar a seleção"
+    }
+  }
+}

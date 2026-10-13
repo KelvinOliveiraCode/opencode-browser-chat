@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark">
+  <title>OpenCode Chat</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header id="bar" class="bar">
+    <div class="bar-left">
+      <span class="dot" id="statusDot" title="Servidor"></span>
+      <select id="sessionPicker" class="pick" title="Sessões"></select>
+      <button id="newSession" class="icon-btn" title="Chat novo (Ctrl+N)">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <div class="bar-right">
+      <button id="eyeBtn" class="text-btn" title="O modelo ver a aba atual (precisa de um modelo com visão)">
+        <span id="eyeLabel">ver tela</span>
+      </button>
+      <button id="modelBtn" class="text-btn" title="Modelo">
+        <span id="modelLabel">modelo</span>
+      </button>
+      <button id="closeBtn" class="icon-btn" title="Fechar">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="thread" class="thread" aria-live="polite">
+    <div id="empty" class="empty">
+      <p class="empty-title">Selecione um texto na página</p>
+      <p>Aparece um menu com explicar, resumir, simplificar, melhorar e mais.</p>
+      <p class="empty-sub">Clique com o botão direito numa imagem para os prompts de visão.</p>
+    </div>
+  </main>
+
+  <footer class="composer">
+    <div id="attachments" class="attachments" hidden></div>
+    <div id="ctxNote" class="ctx-note" hidden></div>
+    <div class="composer-row">
+      <textarea id="input" class="input" rows="1"
+        placeholder="Pergunte, cole um texto ou arraste uma imagem…"></textarea>
+      <button id="send" class="send" title="Enviar (Enter)">
+        <svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+      </button>
+      <button id="stop" class="send stop" title="Parar (Esc)" hidden>
+        <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+      </button>
+    </div>
+    <div class="hints">
+      <span id="status">conectando…</span>
+    </div>
+  </footer>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <span id="modalTitle">—</span>
+        <button id="modalClose" class="icon-btn" title="Fechar">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <input id="modalSearch" class="modal-search" type="search" placeholder="filtrar…" hidden>
+      <div id="modalList" class="modal-list"></div>
+    </div>
+  </div>
+
+  <script src="lib/prompts.js"></script>
+  <script src="lib/api.js" type="module"></script>
+  <script src="panel.js" type="module"></script>
+</body>
+</html>
