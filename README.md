@@ -1,8 +1,41 @@
-# OpenCode Chat Flutuante
+# OpenCode Browser Chat — Extensão Flutuante para Chromium
 
+<<<<<<< HEAD
 ![JavaScript](https://img.shields.io/badge/language-JavaScript-F7DF1E?logo=javascript)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
+=======
+![linguagem: JavaScript](https://img.shields.io/badge/linguagem-JavaScript-blue)  
+![status: concluido](https://img.shields.io/badge/status-concluido-green)  
+![licenca: MIT](https://img.shields.io/badge/licenca-MIT-blue)
+
+### Descrição
+Extensão para Brave (e qualquer Chromium) que abre uma janela de chat flutuante com seus modelos do OpenCode, disparada direto da seleção de texto ou imagem da página. As respostas usam a biblioteca minhas-skills-unificadas.
+
+### O que faz
+Extensão para Brave (e qualquer Chromium) que abre uma janela de chat flutuante com seus modelos do OpenCode, disparada direto da seleção de texto ou imagem da página. As respostas usam a biblioteca minhas-skills-unificadas.
+
+### Tecnologias
+- JavaScript
+- Browser Extension
+- Chromium
+- OpenCode
+
+### Como usar
+Instale as dependências e execute os testes: `npm install && npm test`
+
+### Estrutura
+Consulte a árvore do repositório para a organização exata de pastas e arquivos.
+
+### Testes
+Não há contagem de testes registrada nesta metadata. Adicione e execute testes apropriados à linguagem (pytest para Python, ./mvnw test para Java, npm test para JavaScript/TypeScript).
+
+### Licença
+MIT
+
+### Autor
+Kelvin Oliveira — github.com/KelvinOliveiraCode
+>>>>>>> 8a803ec8bb9d0a8adfd9b47381452c8d0487ffb6
 
 Extensao para navegadores Chromium (Brave, Chrome, Edge) que coloca um chat com os modelos locais do OpenCode numa janela flutuante sobre qualquer pagina. Acionada por selecao de texto, clique direito em imagem ou pelo atalho Alt+Shift+O.
 
@@ -28,8 +61,9 @@ O OpenCode roda no terminal e nao tem interface propria no navegador. Quem esta 
 - JavaScript puro, sem build e sem dependencias externas; modulos ES nativos do navegador.
 - lib/api.js: cliente da API v2 (sessoes, prompts, interrupcao, SSE). lib/prompts.js: pre-prompts do menu e mapa de skills. lib/markdown.js: render de markdown. lib/skills-inject.js: injecao da biblioteca de skills como instrucao interna.
 
-## Como funciona
+# OpenCode Browser Chat — Floating Chromium Extension
 
+<<<<<<< HEAD
 ```
 pagina  ->  content script (shadow DOM)
             ├─ botao flutuante arrastavel
@@ -119,3 +153,35 @@ Nao ha arquivo LICENSE no repositorio. O codigo e do autor; entre em contato ant
 ## Autor
 
 Kelvin
+=======
+![language: JavaScript](https://img.shields.io/badge/language-JavaScript-blue)  
+![status: concluido](https://img.shields.io/badge/status-concluido-green)  
+![license: MIT](https://img.shields.io/badge/license-MIT-blue)
+
+### Description
+Extension for Brave (and any Chromium) that opens a floating chat window with your OpenCode models, triggered directly from page text/image selection. Responses use the minhas-skills-unificadas library.
+
+### What it does
+Extension for Brave (and any Chromium) that opens a floating chat window with your OpenCode models, triggered directly from page text/image selection. Responses use the minhas-skills-unificadas library.
+
+### Technologies
+- JavaScript
+- Browser Extension
+- Chromium
+- OpenCode
+
+### How to use
+Install dependencies and run tests: `npm install && npm test`
+
+### Structure
+Check the repository tree for the exact folder and file organization.
+
+### Tests
+No test count recorded in this metadata. Add and run tests appropriate for the language (pytest for Python, ./mvnw test for Java, npm test for JavaScript/TypeScript).
+
+### License
+MIT
+
+### Author
+Kelvin Oliveira — github.com/KelvinOliveiraCode
+>>>>>>> 8a803ec8bb9d0a8adfd9b47381452c8d0487ffb6
