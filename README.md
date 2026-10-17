@@ -1,342 +1,121 @@
 # OpenCode Chat Flutuante
 
-Extensão para o Brave (e qualquer Chromium) que abre uma janela de chat flutuante
-com **seus** modelos do OpenCode, disparada direto da seleção de texto ou imagem
-da página. As respostas usam a biblioteca **minhas-skills-unificadas** como base.
+![JavaScript](https://img.shields.io/badge/language-JavaScript-F7DF1E?logo=javascript)
+![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4)
 
----
+Extensao para navegadores Chromium (Brave, Chrome, Edge) que coloca um chat com os modelos locais do OpenCode numa janela flutuante sobre qualquer pagina. Acionada por selecao de texto, clique direito em imagem ou pelo atalho Alt+Shift+O.
+
+## Problema / Por que existe
+
+O OpenCode roda no terminal e nao tem interface propria no navegador. Quem esta lendo uma pagina e quer explicar, resumir ou alterar um trecho precisa copiar, mudar de janela e colar no terminal, o que interrompe o fluxo. Esta extensao leva o chat com os modelos do OpenCode para dentro da pagina que esta aberta.
+
+## O que faz
+
+- Botao flutuante arrastavel que abre uma janela de chat; duplo clique devolve o botao ao canto, e Alt+Shift+O abre e fecha o painel.
+- Menu ao selecionar texto com dez acoes: Explicar, Aprofundar, Resumir, Simplificar, Responder a isto, Como melhorar isto, Criticar, Verificar fatos, Traduzir e Argumentos. Clicar numa acao abre o painel com o prompt ja enviado.
+- Clique direito numa imagem com seis acoes de visao: Descrever, Ler texto, Avaliar UI, Diagramar, Gerar prompt e Extrair dados.
+- Dois modelos independentes, texto e visao. Quando a imagem deve ser vista primeiro, ela vai para o modelo de visao, que devolve uma descricao usada como contexto pelo modelo de texto; o modelo de texto nunca ve a imagem.
+- Botao ver tela que captura a pagina visível (reduzida a 1568 pixels, JPEG) e a anexa à próxima mensagem. O painel e escondido durante a captura, entao o modelo ve a pagina, nao a janela de chat.
+- Streaming letra a letra; cartoes de ferramenta (leitura, edicao, shell, busca) vao recolhidos e abrem no clique; raciocínio aparece em bloco colapsavel com duracao quando a API envia.
+- Busca na conversa com Ctrl+F, exportacao em Markdown, JSON e HTML com modelo, agente e data, copia de blocos de codigo e navegacao por teclado (j, k, c, Esc).
+- Pagina de opcoes para endereço, porta e senha do servidor, pasta de trabalho, agente, modelos e ativacao dos menus.
+
+## Stack
+
+- Manifest V3, service worker em background.js, content script em content.js com shadow DOM, e painel como pagina de extensao (panel.html, panel.js, panel.css) dentro de iframe.
+- API v2 do OpenCode local em http://127.0.0.1:4177, autenticacao HTTP Basic com usuario fixo opencode; streaming por SSE em /api/event.
+- JavaScript puro, sem build e sem dependencias externas; modulos ES nativos do navegador.
+- lib/api.js: cliente da API v2 (sessoes, prompts, interrupcao, SSE). lib/prompts.js: pre-prompts do menu e mapa de skills. lib/markdown.js: render de markdown. lib/skills-inject.js: injecao da biblioteca de skills como instrucao interna.
 
 ## Como funciona
 
 ```
-página  →  content script (shadow DOM)
-            ├─ botão flutuante arrastável
-            ├─ menu de pre-prompts ao selecionar texto
+pagina  ->  content script (shadow DOM)
+            ├─ botao flutuante arrastavel
+            ├─ menu de pre-prompts na selecao de texto
             └─ menu de pre-prompts ao clicar direito numa imagem
-                        │
-                        ▼
-          <iframe> panel.html  →  API v2 do OpenCode (127.0.0.1:4177)
-                                 └─ SSE /api/event para streaming
+                           |
+                           v
+      iframe panel.html (pagina de extensao)  ->  API v2 do OpenCode (127.0.0.1:4177)
+                                                 via SSE /api/event
 ```
 
-O painel é uma *extension page* dentro de um `<iframe>`: tem acesso a
-`chrome.storage` e não é afetado pelo CSS do site. Todo o CSS do painel é
-isolado; a UI na página vive num shadow DOM.
+O content script roda no contexto da pagina, entao o painel vive num iframe de outra origem para ter acesso ao chrome.storage e nao sofrer com o CSS do site. A ponte entre eles usa um nonce por carregamento (?oc= na URL do iframe), porque a origem que o painel enxerga e a do site, nao a da extensao.
 
----
+O SSE fica na pagina do painel: o service worker do Manifest V3 e descarregado pelo Chrome e derrubaria o fluxo de eventos ao vivo.
 
-## Instalação
+A captura de tela (ver tela) so e possivel no service worker, que tem chrome.tabs.captureVisibleTab. O painel pede a captura por postMessage, o worker fotografa a aba ativa, reduz para 1568 pixels e devolve como data URL.
 
-### 1. Subir o servidor do OpenCode
+Antes da primeira mensagem de cada sessao, o painel envia uma instrucao interna marcada com [CONFIG_OC]...[/CONFIG_OC] pedindo que o modelo leia o roteador de habilidades em C:\Users\Kelvin\Desktop\minhas-skills-unificadas\SKILL.md. O bloco e removido antes de desenhar; o usuario so ve a propria mensagem.
 
-```powershell
+## Como rodar
+
+Pre-requisito: ter o OpenCode CLI instalado.
+
+1. Suba o servidor local:
+
 powershell -ExecutionPolicy Bypass -File server\start.ps1
-```
 
-Sobe `opencode serve` em `127.0.0.1:4177` com a senha `testefixo123`.
-Para parar: `server\stop.ps1`.
+O servidor sobe em http://127.0.0.1:4177 com a senha testefixo123. Para parar: server\stop.ps1.
 
-Para subir sozinho a cada login:
+2. Carregue a extensao no navegador:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1
-```
+- Abra brave://extensions (ou chrome://extensions).
+- Ative o Modo de desenvolvedor.
+- Clique em Carregar sem compactacao e selecione exatamente a pasta extension (nao a raiz do projeto; so ela contem o manifest.json).
+- O atalho scripts\abrir-pasta.ps1 abre essa pasta pronta.
 
-Cria o atalho `OpenCode Chat - servidor.lnk` na pasta de Inicialização do
-Windows. É idempotente: rodar duas vezes não abre dois servidores. Para
-remover: `scripts\install-startup.ps1 -Remove`.
+3. Abra brave://extensions -> Opcoes da extensao e confirme endereço, porta, senha e pasta de trabalho do servidor.
 
-> A senha precisa bater com a da extensão. Se mudar, ajuste em
-> `server\start.ps1 -Password ...` **e** na página de opções.
+4. Clique no botao flutuante (canto direito da pagina) ou pressione Alt+Shift+O para abrir o chat.
 
-### 2. Carregar a extensão no Brave
+A senha precisa bater com a do servidor. Se mudar, ajuste em server\start.ps1 -Password ... e na pagina de opcoes.
 
-1. Abra `brave://extensions`
-2. Ligue **Modo de desenvolvedor**
-3. **Carregar sem compactação** e escolha **esta pasta exata**:
+## Estrutura do projeto
 
-```
-C:\Users\Kelvin\Desktop\opencode-browser-chat\extension
-```
-
-> A pasta `opencode-browser-chat` (a do projeto) **não** tem `manifest.json`.
-> Se você selecionar ela, o Brave responde "arquivo de manifesto não existe ou
-> não pode ser lido". Só a subpasta `extension` tem o manifesto na raiz.
->
-> Atalho: `scripts\abrir-pasta.ps1` abre a pasta certa já selecionada.
-
-### 3. Abrir o chat
-
-Clique no botão flutuante ( canto direito ). Arraste para mover, duplo clique
-devolve ao canto. `Alt+Shift+O` abre e fecha.
-
----
-
-## Menu de seleção
-
-Selecione um texto e o menu aparece com 10 ações:
-
-| Ação | O que faz | Skill |
-|---|---|---|
-| Explicar | do zero, com analogia | — |
-| Aprofundar | implícito, histórico, contraexemplos | — |
-| Resumir | 3–5 frases | — |
-| Simplificar | linguagem direta | — |
-| Responder a isto | abre o chat pronto pra pergunta | — |
-| Como melhorar isto | sugestões com trecho a trocar | `antislop-copywriting` |
-| Criticar | erros e lógica frágil | — |
-| Verificar fatos | o que checar na web | `grounded-citations` |
-| Traduzir | PT-BR natural | — |
-| Argumentos | a favor e contra | — |
-
-Clicar em qualquer uma **abre o painel já com o prompt enviado**.
-
-**Botão direito numa imagem** abre 6 ações de visão: Descrever, Ler texto
-(OCR), Avaliar UI, Diagramar, Gerar prompt, Extrair dados.
-
----
-
-## Skills
-
-> **A parte das skills fica oculta.** Antes da primeira mensagem de cada
-> sessão o painel manda uma instrução interna pedindo que o modelo leia o
-> roteador de `minhas-skills-unificadas`. Ela viaja marcada com
-> `[CONFIG_OC]…[/CONFIG_OC]`, o painel tira esse bloco antes de desenhar, e
-> você vê só a sua mensagem.
-
-Nao ha parte de skills na interface - voce nao escolhe nada.
-
-Antes da **primeira** mensagem de cada sessao, o painel injeta uma instrucao
-pedindo que o modelo leia o roteador em
-`C:\Users\Kelvin\Desktop\minhas-skills-unificadas\SKILL.md`, decida o produto
-final e abra a skill correspondente. O roteador tambem vai anexado como skill,
-entao a tabela de roteamento ja esta no contexto.
-
-A instrucao e marcada com `[CONFIG_OC]...[/CONFIG_OC]` e **nao aparece na
-conversa**: o painel reconhece o marcador e desenha so a sua mensagem.
-
----
-
-## Modelos
-
-Em **Configurações** você escolhe **dois** modelos, com *effort* cada:
-o de **texto** e o de **visão**. Os dois são independentes.
-
-> `effort` é o nível de raciocínio (`low` / `medium` / `high`). Quanto mais
-> alto, melhor a resposta e mais lenta a geração.
-
-### Um modelo só
-
-Com *"Usar o mesmo modelo de texto"* marcado, a imagem anexada vai direto para
-o modelo de texto — que precisa enxergar imagem. É o comportamento antigo.
-
-### Dois modelos
-
-Desmarcando, entra em cena um segundo modelo **só para a visão**. Aí o fluxo
-muda:
-
-1. a imagem vai para o modelo de visão, que devolve uma **descrição** do que vê;
-2. essa descrição entra como contexto no prompt do modelo de texto;
-3. o modelo de texto responde **sem nunca ver a imagem**.
-
-A sessão do modelo de visão é criada e descartada na hora, então o histórico da
-sua conversa fica limpo, sem um par de turnos de "descreva isto" no meio.
-
-Serve para dois casos: quando o modelo que você prefere para conversar **não
-tem visão**, e quando o de visão é melhor descrevendo do que raciocinando. No
-effort do de visão, `low` costuma bastar — a tarefa é descrever, não pensar.
-
-### Primeira vez
-
-Sem nenhum escolhido, abrir o painel pergunta o modelo. A escolha fica guardada
-e vale para toda conversa nova; as sessões já existentes mantêm o modelo que
-nasceram com.
-
----
-
-O botão **modelo** lista os modelos que a sua conta tem, com filtro de busca
-e seletor de variante (`low`/`high`/`xhigh`/...).
-
-A escolha vira o **padrão**: fica guardada e é usada em toda sessão nova, sem
-perguntar de novo. A guarda é só da extensão — o que você escolhe no CLI não
-mexe aqui.
-
-Na **primeira vez**, abrir o painel abre o seletor sozinho: não há modelo
-escolhido, então o servidor responderia pelo default dele e você nem saberia
-qual foi. Escolhido um, a conversa começa com ele. Fechar o seletor sem
-escolher não trava nada: a próxima vez que você abrir o painel ele volta, e o
-envio avisa que falta escolher.
-
-Na pergunta automática a variante vai na `default`, sem um segundo modal — você
-foi pedido para escolher o *modelo*, não o nível de raciocínio. Abrindo o
-botão na mão, a variante continua sendo perguntada.
-
----
-
-## Enquanto o modelo trabalha
-
-Três pontinhos pulando dizem **o que** ele está fazendo: pensando, lendo o
-arquivo, codando, pesquisando na web, rodando o comando, delegando a um
-subagente. O rótulo vem do nome da ferramenta que entrou no stream, então
-acompanha o trabalho de verdade — não é um "carregando" genérico.
-
-Os cartões de cada ferramenta (`read`, `edit`, `shell`, `webfetch`) vêm
-**recolhidos**: uma conversa longa emenda vários em sequência e o conteúdo de
-cada um empurraria a resposta do modelo para fora da tela. Um clique abre e
-mostra o diff, a saída ou o preview; outro fecha. O estado também está no
-`aria-expanded` do cabeçalho.
-
----
-
-## Ver a tela
-
-O botão **ver tela** na barra anexa a aba visível atual à próxima mensagem.
-
-O botão **ver tela** na barra anexa a aba visível atual à próxima mensagem,
-para o modelo olhar a página como você vê. Só fica habilitado com um modelo
-que tem visão — a checagem usa o capability `image` do catálogo real de
-`/api/model`.
-
-A captura vem do `chrome.tabs.captureVisibleTab` (só o service worker tem
-acesso), é reduzida para 1568px e anexada como JPEG.
-
-> O próprio painel **não aparece** no print: ele é escondido antes da captura e
-> devolvido depois. O modelo vê a página, não a janela de chat.
-
----
-
-## Sessões
-
-O seletor mostra as mesmas sessões do `opencode session list` do CLI.
-
-A API devolve também os **subagentes** (as sessões filhas que o `task` cria):
-no projeto do Desktop, das 200 linhas que o servidor mandava, só 33 eram
-conversas de verdade e 167 eram filhos de subagente. Aqui as linhas com
-`parentID` são descartadas e a paginação continua até encher a lista — filtrar
-só a primeira página de 200 deixaria a lista quase vazia de conversas reais.
-
-Clique no botão flutuante sempre começa uma sessão nova. Só continua uma
-antiga se você escolher no seletor.
-
----
-
-## O que aparece no painel
-
-| Bloco | Como aparece |
-|---|---|
-| **raciocínio** | `<details>` recolhido, com a duração quando a API manda |
-| **texto** | markdown: código, tabelas, listas, blockquote |
-| **edit / write** | card com **diff colorido** — `+` verde, `−` vermelho, cabeçalho `@@` e contador `+n −n` |
-| **bash / shell** | comando resumido + saída |
-| **read** | caminho + preview do arquivo |
-| **grep / glob** | padrão buscado + resultados |
-| **websearch / webfetch** | consulta ou URL + retorno |
-| **todowrite** | checklist com ☑ feito / ◐ em andamento / ☐ pendente e prioridade |
-| **skill** | qual skill foi carregada |
-| **question** | pergunta e a resposta dada |
-| **erro** | card vermelho com a mensagem do provedor |
-| **retry** | linha de tentativa com o motivo |
-
-Cada card de ferramenta é uma linha resumida (`✓ editar  …\projeto\src\app.tsx`)
-que expande no clique. Durante a geração, os cards aparecem em tempo real:
-o input da ferramenta é transmitindo caractere a caractere
-(`session.tool.input.ended`) e o resultado entra quando chega.
-
-**Diff:** a API só manda `metadata.diff` quando o arquivo está sob snapshot
-do OpenCode — na prática, dentro de um repositório git. Fora disso o painel
-reconstrói o diff a partir de `oldString`/`newString` (edit) ou `content`
-(write), então você sempre vê o que mudou.
-
----
-
-## Atalhos
-
-| Atalho | Ação |
-|---|---|
-| `Alt+Shift+O` | abre/fecha o painel |
-| `Ctrl+N` (no painel) | sessão nova |
-| `Enter` | envia |
-| `Shift+Enter` | nova linha |
-| `Esc` | fecha o modal / interrompe a geração |
-| botão direito na imagem | menu de visão |
-| arrastar o botão | move; duplo clique reseta |
-
-Também dá para colar imagem (Ctrl+V) e arrastar arquivo de imagem para dentro
-do painel.
-
----
-
-## Opções
-
-`brave://extensions` → **Opções** na extensão, ou pelo ícone na barra.
-
-- endereço, porta e senha do servidor
-- pasta de trabalho (define onde as sessões são gravadas)
-- ligar/desligar botão flutuante, menu de texto, menu de imagem
-- se o menu de imagem substitui o menu nativo do navegador
-
----
-
-## Testes
-
-```powershell
-# contrato da API contra o servidor real
-node scripts\e2e-test.mjs
-
-# extensão carregada no Brave, via CDP
-node scripts\browser-test.mjs extension
-
-# render das partes (cria sessão real, força write+edit+bash, confere o DOM)
-node scripts\parts-render-test.mjs extension shots
-
-# envio real pelo caminho da extensão: botão -> sessão -> prompt -> resposta
-node scripts\send-repro.mjs extension shots
-
-# print da tela sem o painel + sessão nova ao clicar no botão
-node scripts\capture-test.mjs extension shots
-
-# modelo padrão: 1ª vez pergunta, depois lembra
-node scripts\model-default-test.mjs extension
-
-# só carregar a extensão e ver se o content script entra
-node scripts\load-check.mjs extension
-
-# screenshots do painel
-node scripts\shot-panel.mjs extension shots
-```
-
----
-
-## Arquivos
-
-```
 extension/
-  manifest.json
-  content.js          botão flutuante + menus (shadow DOM)
-  content.css
-  panel.html/css/js   janela de chat
-  options.html/js     configurações
-  background.js       service worker (bridge de imagem, menu de contexto)
-  lib/prompts.js      os 16 pre-prompts + mapa de skills
-  lib/api.js          cliente da API v2 do OpenCode
-  icons/
+  manifest.json            manifesto Manifest V3
+  background.js            service worker (captura de tela, imagens, menu de contexto, atalhos)
+  content.js               botao flutuante e menus no shadow DOM da pagina
+  content.css              estilos do botao, painel, menus e grip de redimensionar
+  panel.html / panel.js / panel.css   janela de chat (pagina de extensao em iframe)
+  options.html / options.js           configuracoes do servidor e comportamento
+  lib/api.js               cliente da API v2 do OpenCode
+  lib/prompts.js           pre-prompts do menu e mapa de skills
+  lib/markdown.js          render de markdown
+  lib/skills-inject.js     injecao da biblioteca de skills na primeira mensagem
+  icons/                   icones de 16, 32, 48 e 128 pixels
 server/
-  start.ps1  stop.ps1
+  start.ps1  stop.ps1  restart.ps1   sobe, para e reinicia o servidor local
 scripts/
-  e2e-test.mjs  browser-test.mjs  shot-panel.mjs  make-icons.mjs
-```
+  *.mjs                    testes de navegador e de contrato da API (precisam do servidor no ar)
+shots/                     capturas da interface
 
----
+## Trade-offs e decisoes
 
-## Notas
+- Painel como pagina de extensao dentro de iframe: o stream SSE sobrevive ao descarregamento do service worker e o CSS do site nao entra no chat. O preco e a comunicacao por postMessage entre mundos diferentes.
+- Ponte autenticada por nonce, nao por origem: o content script roda no contexto da pagina, entao a origem vista pelo painel e a do site. O nonce (?oc=) e o que valida o canal; uma pagina estranha nao consegue injetar comando no painel.
+- Captura apenas no service worker: chrome.tabs.captureVisibleTab nao esta disponivel no content script.
+- Modelo de visao separado: a sessao temporaria de descricao de imagem e apagada depois, para nao poluir o historico com pares de turnos descreva isto.
+- Sem build e sem dependencias: qualquer um pode inspecionar os arquivos e carregar a pasta direto no modo de desenvolvedor.
+- Clicar no botao flutuante sempre começa uma sessao nova; so se continua uma sessao antiga escolhendo-a no seletor.
 
-- **Autenticação**: HTTP Basic, usuário fixo `opencode`, senha do
-  `OPENCODE_SERVER_PASSWORD`. Guardada só no `chrome.storage.local` deste
-  navegador.
-- **Anexos**: a API só aceita `data:` URL. Imagens remotas são baixadas e
-  redimensionadas (max 1568px, JPEG 85%) pelo content script ou, se o CORS
-  bloquear, pelo service worker.
-- **Sessões**: cada menu de pre-prompt abre uma sessão nova por padrão
-  (configurável). O histórico fica na pasta de trabalho escolhida.
-- O SSE fica na página do painel, não no service worker — worker do MV3 é
-  descarregado pelo Chrome e derrubaria o stream.
+## Limitações conhecidas
+
+- Exige o servidor do OpenCode rodando localmente (http://127.0.0.1:4177). Sem servidor, o painel mostra servidor offline.
+- A primeira mensagem de uma sessao nova pode receber HTTP 500 (cold start do servidor: plugins e modelo ainda carregando). A extensao reenvia uma vez; se falhar de novo, o servidor pode precisar de mais tempo.
+- Ver tela exige que a aba do painel esteja em foco e que a janela do navegador esteja focada; caso contrario, a extensao avisa em vez de travar.
+- Imagens remotas de origem cruzada sem CORS podem falhar na captura. Abra a imagem numa aba e tente de novo, ou use ver tela.
+- Duas instancias do painel abertas ao mesmo tempo nao sao suportadas; o stream SSE e unico.
+- Mudar senha, porta ou pasta de trabalho nas opcoes vale para novas abas; abas ja abertas precisam ser recarregadas para o botao aparecer.
+- Na primeira vez, nenhuma mensagem e enviada ate escolher um modelo.
+- Os caminhos da biblioteca de skills estao fixos em C:\Users\Kelvin\Desktop\minhas-skills-unificadas\SKILL.md; a injecao e automatica e nao aparece na interface.
+
+## Licenca
+
+Nao ha arquivo LICENSE no repositorio. O codigo e do autor; entre em contato antes de copiar ou reutilizar.
+
+## Autor
+
+Kelvin
