@@ -1,85 +1,94 @@
 # opencode-browser-chat
 
-![JavaScript/TypeScript](https://img.shields.io/badge/JS-TS-yellow?logo=javascript)   ![status: concluido](https://img.shields.io/badge/status-concluido-green)   ![licenca: MIT](https://img.shields.io/badge/licenca-MIT-blue)
+[![HTML/CSS/JS](https://img.shields.io/badge/HTML-CSS-JS-orange)](https://developer.mozilla.org/)   ![status: concluido](https://img.shields.io/badge/status-concluido-green)   ![licenca: MIT](https://img.shields.io/badge/licenca-MIT-blue)
 
 ## Resumo
 
-Aplicacao web em JavaScript/TypeScript. OpenCode Browser Chat: Floating chat extension for Chromium (Brave/Chrome) with your OpenCode models, text/image selection menus, and skills integration.
+OpenCode Browser Chat: Floating chat extension for Chromium (Brave/Chrome) with your OpenCode models, text/image selection menus, and skills integration.
+## Problema / Por que existe
 
-## Problema / por que existe
-
-O projeto entrega uma interface ou utilitario web para um recorte especifico, com foco em navegador como ambiente de execucao e sem dependencia de servidor proprio.
-
+O projeto aborda um recorte prático e automatiza uma tarefa que, feita manualmente, é repetitiva e propensa a erro. O foco está em transformar dados ou processos em saída confiável, com código legível, testável e extensível.
 ## Arquitetura
 
-- Camada de apresentacao: componentes e paginas que renderizam a interface.
-- Camada de logica: funcoes e hooks que processam dados e estado.
-- Comunicacao: requisicoes HTTP a APIs externas ou dados locais, quando aplicavel.
+Arquivos de código (28):
+- `options.html`
+- `panel.html`
+- `content.css`
+- `panel.css`
+- `background.js`
+- `content.js`
+- `api.js`
+- `prompts.js`
+- `skills-inject.js`
+- `options.js`
+- `panel.js`
+- `manifest.json`
+- `browser-test.mjs`
+- `capture-test.mjs`
+- `e2e-test.mjs`
+## Padrões de Projeto e Técnicas Identificadas
 
-O build e feito com Vite (ou ferramenta equivalente), gerando arquivos estaticos prontos para hospedagem.
-
-## Tecnologias
-
-- JavaScript / TypeScript
-- (nenhum informado no repositorio)
-
-- Sem CI configurado neste repositorio.
-
-Nenhum teste automatizado detectado na varredura.
-
+- Custom CSS styling
+- ESM build scripts (.mjs)
+- JSON data catalog
+- Single-page HTML entry
+- Vanilla JavaScript logic
 ## O que faz
 
 OpenCode Browser Chat: Floating chat extension for Chromium (Brave/Chrome) with your OpenCode models, text/image selection menus, and skills integration.
-
 ## Como rodar
 
-Requisitos: Node.js e npm (ou yarn/pnpm).
+Abra o arquivo `index.html` diretamente no navegador, ou sirva localmente:
 
+```bash
+python -m http.server 8080
+# acesse http://localhost:8080
 ```
-# instalar dependencias
-npm install
+## Estrutura do Projeto
 
-# rodar em desenvolvimento
-python main.py
+- `options.html`
+- `panel.html`
+- `content.css`
+- `panel.css`
+- `background.js`
+- `content.js`
+- `api.js`
+- `prompts.js`
+- `skills-inject.js`
+- `options.js`
+- `panel.js`
+- `manifest.json`
+- `browser-test.mjs`
+- `capture-test.mjs`
+- `e2e-test.mjs`
+- `load-check.mjs`
+- `make-icons.mjs`
+- `model-default-test.mjs`
+- `new-features-test.mjs`
+- `options-model-test.mjs`
+- `parts-render-test.mjs`
+- `send-repro.mjs`
+- `shot-panel.mjs`
+- `skills-inject-test.mjs`
+- `toolcard-test.mjs`
+## Trade-offs e Decisões Técnicas
 
-# build para producao
-npm run build
+- Arquivo único (ou poucos): fácil de hospedar em qualquer servidor estático (GitHub Pages, Netlify, Vercel) e de auditar linha a linha.
+- Sem build, sem servidor, sem banco de dados.
+- Dados em snapshot (quando aplicável), não em tempo real ,  o usuário confirma na fonte oficial linkada.
+- Tema claro/escuro persistido em `localStorage` sem JavaScript externo.
+## Limitações Conhecidas
 
-# rodar testes
-pytest
-```
-
-## Estrutura do projeto
-
-- scripts/ (18 arquivo(s))
-- extension/ (16 arquivo(s))
-- server/ (2 arquivo(s))
-- .gitignore, README.en.md, README.md
-
-
-## Trade-offs e decisões
-
-- Build estatico: facil de hospedar (GitHub Pages, Vercel, Netlify) sem servidor.
-- Dependencias minimas para reduzir superficie de manutencao.
-- Navegador como unico ambiente de execucao necessario.
-
-## Limitações conhecidas
-
-- Funciona no navegador; depende de conexao a internet para recursos externos.
-- Nenhum teste automatizado detectado.
-
-
+- Sem backend; funcionalidade limitada ao navegador.
+- Dados estáticos ou em snapshot; confirme valores em fontes oficiais.
+- Não há autenticação nem multi-usuário.
 ## Testes
 
-```
-pytest
-```
-
+Nenhum teste automatizado detectado (projeto de documentação/guia).
 ## Licença
 
-Distribuído sob a licenca MIT. Consulte o arquivo `LICENSE` do repositorio.
-
+Distribuído sob a licença MIT. Consulte o arquivo `LICENSE` do repositório.
 ## Autor
 
-Kelvin Oliveira, https://github.com/KelvinOliveiraCode
+Kelvin Oliveira ,  https://github.com/KelvinOliveiraCode
 Portfolio: https://kelvinoliveiracode.github.io/portfolio/
