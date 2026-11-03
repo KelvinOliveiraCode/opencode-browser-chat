@@ -193,36 +193,49 @@ const antes = await Q.evaluate(`({
 })`);
 console.log('  botão antes:', JSON.stringify(antes));
 
-// A captura depende de a janela estar focada, e quem vem depois fica em
-// segundo plano. Repetir algumas vezes: nesse ambiente a janelaoscila entre
-// focada e não focada, e captureVisibleTab trava quando não está.
-const cap = await Q.evaluate(`new Promise((res) => {
-  const btn = document.getElementById('eyeBtn');
-  btn.disabled = false;
-  let mid = null;
-  const h = (e) => { if (e.data?.type === 'oc:captured') mid = e.data.dataUrl; };
-  window.addEventListener('message', h);
-  let tentativas = 0;
-  const tentar = () => {
-    if (++tentativas > 5) {
-      window.removeEventListener('message', h);
-      const img = document.querySelector('#attachments img');
-      return res({ recebeu: !!mid, viaHandler: img ? { len: img.src.length } : null,
-                   tentativas, label: document.getElementById('eyeLabel').textContent });
-    }
+// A captura depende de a janela estar focada: captureVisibleTab TRAVA (não
+// rejeita) quando a janela está encoberta ou em segundo plano. Num teste
+// dirigido por CDP isso é comum, então cada tentativa traz a aba para a
+// frente antes de pedir o print — e a espera é longa, porque a extensão
+// espera o compositor repintar antes de fotografar.
+const armCapture = await Q.evaluate(`(() => {
+  window.__cap = { mid: null };
+  if (!window.__capH) {
+    window.__capH = (e) => { if (e.data?.type === 'oc:captured') window.__cap.mid = e.data.dataUrl; };
+    window.addEventListener('message', window.__capH);
+  }
+  return true;
+})()`);
+
+let cap = { recebeu: false, viaHandler: null, tentativas: 0 };
+for (let tentativa = 1; tentativa <= 5; tentativa++) {
+  await P.send('Page.bringToFront').catch(() => {});
+  await sleep(500);
+  await Q.evaluate(`(() => {
+    window.__cap.mid = null;
+    const btn = document.getElementById('eyeBtn');
+    btn.disabled = false;
     btn.click();
-    setTimeout(() => {
-      if (mid) {
-        window.removeEventListener('message', h);
-        const img = document.querySelector('#attachments img');
-        return res({ recebeu: true, viaHandler: img ? { len: img.src.length } : null,
-                     tentativas, label: document.getElementById('eyeLabel').textContent });
-      }
-      tentar();
-    }, 4000);
-  };
-  tentar();
-})`);
+    return true;
+  })()`);
+
+  // a extensão dá um prazo antes de desistir; esperar menos que isso só
+  // contaria como falha o que ainda está a caminho
+  let mid = null;
+  for (let i = 0; i < 30; i++) {
+    await sleep(1000);
+    mid = await Q.evaluate(`window.__cap.mid ? window.__cap.mid.length : 0`);
+    if (mid) break;
+  }
+
+  cap = await Q.evaluate(`(() => {
+    const img = document.querySelector('#attachments img');
+    return { recebeu: !!window.__cap.mid, viaHandler: img ? { len: img.src.length } : null,
+             tentativas: ${tentativa}, label: document.getElementById('eyeLabel').textContent };
+  })()`);
+  if (cap.recebeu) break;
+  console.log(`  tentativa ${tentativa} sem captura, repetindo…`);
+}
 
 console.log('  captura:', JSON.stringify(cap).slice(0, 140));
 const capToast = await Q.evaluate(`document.querySelector('.toast')?.textContent || '(sem toast)'`);
@@ -231,7 +244,7 @@ console.log('  toast:', capToast);
 const direto = await Q.evaluate(`new Promise((res) => {
   chrome.runtime.sendMessage({ type: 'oc:captureVisibleTab' }, (r) =>
     res(r ? { ok: r.ok, erro: r.error || null, len: (r.dataUrl || '').length } : { semResposta: true }));
-  setTimeout(() => res({ timeout: true }), 8000);
+  setTimeout(() => res({ timeout: true }), 15000);
 })`);
 console.log('  service worker direto:', JSON.stringify(direto));
 add('captura anexada', (cap.viaHandler?.len || 0) > 3000, JSON.stringify(cap).slice(0, 90));
@@ -252,10 +265,15 @@ if (dump) {
 }
 
 // a imagem da página: mede as faixas. o painel é escuro (#0e1014) e opaco.
+// img.decode() pode nunca assentar com data URL grande em página de
+// extensão (mesmo motivo de shrinkImage() usar onload): espera naturalWidth.
 const analise = await Q.evaluate(`(async () => {
   const img = document.querySelector('#attachments img');
   if (!img) return null;
-  await img.decode();
+  for (let i = 0; i < 60 && !img.naturalWidth; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!img.naturalWidth) return null;
   const c = document.createElement('canvas');
   c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d');

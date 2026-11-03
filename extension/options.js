@@ -13,8 +13,10 @@ const DEFAULTS = {
   port: 4177,
   password: 'testefixo123',
   directory: 'C:\\Users\\Kelvin\\Desktop',
-  model: { providerID: 'kilo4', id: 'stepfun/step-5-preview-free', variant: 'medium' },
-  modelLabel: '[K4] Step 5 Preview',
+  // kilo3/step-5-preview-free: o kilo4 passou a devolver HTTP 500 (cota
+  // estourada) e deixava a primeira mensagem sempre falhar.
+  model: { providerID: 'kilo3', id: 'stepfun/step-5-preview-free' },
+  modelLabel: '[K3] Step 5 Preview',
   agent: 'plan',
   skills: [SKILL_ROUTER],
   skillsLabel: '',
@@ -57,6 +59,12 @@ async function load() {
     'preventImageContextMenu', 'autoOpenOnPrompt']) {
     $(key).checked = !!s[key];
   }
+  const agente = cfg.agent || 'plan';
+  const selAgente = $('agentMode');
+  if (selAgente && ![...selAgente.options].some((o) => o.value === agente)) {
+    selAgente.append(new Option(agente, agente));
+  }
+  if (selAgente) selAgente.value = agente;
 
   // os dois seletores dividem a mesma lista de modelos
   await carregarModelos();
@@ -369,5 +377,15 @@ $('reloadModels').addEventListener('click', carregarModelos);
 $('save').addEventListener('click', saveCfg);
 $('save2').addEventListener('click', saveSettings);
 $('test').addEventListener('click', test);
+
+async function salvarAgente() {
+  const got = await chrome.storage.local.get(['cfg']);
+  const cfg = Object.assign({}, DEFAULTS, got.cfg || {});
+  cfg.agent = $('agentMode').value;
+  await chrome.storage.local.set({ cfg });
+  status(`Modo do agente: ${cfg.agent}. Vale para as conversas novas.`, 'ok');
+}
+
+$('saveAgent').addEventListener('click', salvarAgente);
 
 load();

@@ -156,7 +156,12 @@ add('rotulo de skill visivel', imgMenu?.skills > 0, `skills=${imgMenu?.skills}`)
 console.log('\n== painel ==');
 const iframeSrc = await P.evaluate(
   `document.getElementById('oc-host').shadowRoot.querySelector('iframe').src`);
-add('iframe -> panel.html', /panel\.html$/.test(iframeSrc || ''), iframeSrc);
+// query string é esperada: o iframe leva ?oc=<nonce>&from=<origem da página>
+// para o painel responder ao dono certo (ver postMessage em panel.js)
+add('iframe -> panel.html', /panel\.html(\?|$)/.test(iframeSrc || ''), iframeSrc);
+const qs = new URL(iframeSrc).searchParams;
+add('iframe leva nonce do canal', (qs.get('oc') || '').length >= 16, `oc=${qs.get('oc')}`);
+add('iframe leva origem da página para o postMessage', !!qs.get('from'), `from=${qs.get('from')}`);
 
 await P.evaluate(`document.getElementById('oc-host').shadowRoot.querySelector('.oc-bubble').click()`);
 await sleep(3500);

@@ -115,7 +115,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // precisa de <all_urls> em host_permissions (a extensão já tem).
   if (msg?.type === 'oc:captureVisibleTab') {
     const win = sender?.tab?.windowId ?? chrome.windows.WINDOW_ID_CURRENT;
-    chrome.tabs.captureVisibleTab(win, { format: 'jpeg', quality: 78 })
+    const abaDoPainel = sender?.tab?.id ?? null;
+
+    // captureVisibleTab fotografa a ABA ATIVA da janela, não a aba que pediu.
+    // Com o painel numa aba de fundo (ou depois de abrir a página de opções,
+    // que o install abre numa aba nova), o print sairia de outra página
+    // qualquer — sem aviso, e o modelo responderia sobre a coisa errada.
+    chrome.tabs.query({ active: true, windowId: win })
+      .then(([ativa]) => {
+        if (abaDoPainel != null && ativa && ativa.id !== abaDoPainel) {
+          throw new Error(
+            `a aba do painel não está em foco (ativa: ${ativa.url?.slice(0, 60) || ativa.id}). ` +
+            'Clique na aba e tente de novo.'
+          );
+        }
+        // Timeout guard: captureVisibleTab trava (sem rejeitar) quando a
+        // janela não está focada. O prazo é generoso de propósito: com 3s o
+        // corte chegava antes da resposta em janelas lentas, e o print saía
+        // do nada. O content script tem a rede final de 12s.
+        const prazo = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('a janela do navegador não está focada')), 9000));
+        return Promise.race([
+          chrome.tabs.captureVisibleTab(win, { format: 'jpeg', quality: 78 }),
+          prazo
+        ]);
+      })
       .then((dataUrl) => sendResponse({ ok: true, dataUrl }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;

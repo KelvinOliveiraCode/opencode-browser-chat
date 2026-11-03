@@ -191,6 +191,19 @@
     #visionGroup.off { opacity: .38; pointer-events: none; }
   </style>
   <section>
+    <h2>Modo do agente</h2>
+    <div class="row">
+      <label for="agentMode">Como o modelo trabalha</label>
+      <select id="agentMode">
+        <option value="plan">plan &mdash; pensa e propoe, nao mexe em arquivo</option>
+        <option value="build">build &mdash; le, escreve e edita arquivo</option>
+        <option value="orchestrator">orchestrator &mdash; divide a tarefa e delega</option>
+      </select>
+      <span class="hint">Vale para as conversas novas. As sessoes jah abertas mantem o modo em que nasceram.</span>
+    </div>
+    <div class="actions"><button id="saveAgent" class="primary">Salvar modo</button></div>
+  </section>
+  <section>
     <h2>Comportamento</h2>
     <div class="row">
       <label class="check"><input id="showBubble" type="checkbox"> Mostrar o botão flutuante na tela</label>

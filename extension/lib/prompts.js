@@ -16,6 +16,27 @@
 (function () {
   const SKILL_ROUTER = 'minhas-skills-unificadas';
 
+  /**
+   * Vai na frente de todo pre-prompt.
+   *
+   * Sem isso o modelo tratava qualquer seleção como um texto genérico: pedia
+   * para "explicar" e vinha uma resposta de manual, mesmo quando o trecho era
+   * um anúncio, um comentário de blog ou um erro de compilação. A instrução
+   * força olhar a página de origem e a natureza do material antes de responder.
+   */
+  const ADAPTAR_TEXTO =
+    'Antes de responder, analise o contexto: a página de origem, o tipo de material ' +
+    '(técnico, jornalístico, publicitário, código, conversa, erro) e para quem parece ser. ' +
+    'Adapte tom, profundidade e formato a esse contexto — não aplique uma resposta genérica. ' +
+    'Se o contexto não bastar para decidir, diga em uma linha que leitura você assumiu.';
+
+  /** O mesmo, para imagem: o que a imagem é manda na resposta. */
+  const ADAPTAR_IMAGEM =
+    'Antes de responder, analise o contexto da imagem: que tipo de imagem é ' +
+    '(tela de aplicativo, foto, diagrama, documento, print de código, anúncio), ' +
+    'de onde parece ter vindo e para quem é. Adapte tom, profundidade e formato ao que ' +
+    'a imagem é. Se a imagem não permitir decidir, diga que leitura você assumiu.';
+
   const TEXT_PROMPTS = [
     {
       id: 'explicar',
@@ -215,11 +236,12 @@
     'Diga: o que é esta página, para quem é e qual é a proposta central. Máximo 5 frases.';
 
   function buildTextPrompt(item, selection, page) {
-    return item.template.replace('{{texto}}', selection).replace('{{pagina}}', page);
+    return ADAPTAR_TEXTO + '\n\n' +
+      item.template.replace('{{texto}}', selection).replace('{{pagina}}', page);
   }
 
   function buildImagePrompt(item, page) {
-    return item.template.replace('{{pagina}}', page);
+    return ADAPTAR_IMAGEM + '\n\n' + item.template.replace('{{pagina}}', page);
   }
 
   function describePage(url, title) {

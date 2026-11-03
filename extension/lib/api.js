@@ -24,6 +24,7 @@ export class OpencodeClient extends EventTarget {
     this.stream = null;
     this.streamAbort = null;
     this.connected = false;
+    this._streamGuard = { active: false }; // prevents concurrent openStream calls
   }
 
   get base() {
@@ -74,6 +75,17 @@ export class OpencodeClient extends EventTarget {
         throw err;
       }
       return json;
+    } catch (err) {
+      // AbortError do nosso próprio timer vira "signal is aborted without
+      // reason", que não explica nada para quem está lendo. Traduz para
+      // "tempo esgotado", com o caminho para dar contexto.
+      if (err.name === 'AbortError' && controller.signal.aborted && !signal?.aborted) {
+        const e = new Error(`tempo esgotado em ${Math.round(timeout / 1000)}s (${method} ${path})`);
+        e.status = 0;
+        e.tag = 'TimeoutError';
+        throw e;
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }
@@ -172,7 +184,7 @@ export class OpencodeClient extends EventTarget {
     return res?.data ?? [];
   }
 
-  async prompt(id, { text, files = [], skills = [], delivery = 'steer' } = {}) {
+  async prompt(id, { text, files = [], skills = [], delivery = 'steer', signal } = {}) {
     // `skills` chega em duas formas: string ('nome-da-skill') ou o objeto
     // {name} que o roteador monta. Embrulhar sem normalizar mandava
     // agents[0].name = {name: '...'} e o servidor respondia
@@ -182,9 +194,13 @@ export class OpencodeClient extends EventTarget {
       .filter((name) => typeof name === 'string' && name.length > 0)
       .map((name) => ({ name }));
 
-    const res = await this.request(`/api/session/${id}/prompt`, {
+    const body = () => ({
       method: 'POST',
-      timeout: 30000,
+      // 120s: o servidor espera a resposta do modelo antes de devolver o
+      // POST. Com 30s um modelo lento estourava o prazo do cliente e a pessoa
+      // via "signal is aborted without reason" — um erro que não diz nada.
+      timeout: 120000,
+      signal,
       body: {
         text,
         ...(files.length ? { files } : {}),
@@ -192,7 +208,22 @@ export class OpencodeClient extends EventTarget {
         delivery
       }
     });
-    return res?.data;
+
+    try {
+      const res = await this.request(`/api/session/${id}/prompt`, body());
+      return res?.data;
+    } catch (err) {
+      // O servidor devolve 500 na PRIMEIRA chamada de uma sessão nova
+      // (cold start: plugins/modelo ainda carregando) — medido: 19s e 500 na
+      // primeira, 26ms nas seguintes. A tentativa seguinte passa. Reenviar
+      // uma vez esconde esse soluço de inicialização de quem está usando.
+      if (err.status === 500) {
+        await new Promise((r) => setTimeout(r, 500));
+        const res = await this.request(`/api/session/${id}/prompt`, body());
+        return res?.data;
+      }
+      throw err;
+    }
   }
 
   async interrupt(id) {
@@ -224,51 +255,64 @@ export class OpencodeClient extends EventTarget {
    * Importante: NÃO devolve a promise do loop. Quem chama costuma fazer
    * `await openStream()` e ficaria preso enquanto o stream estivesse vivo.
    * Erros de conexão chegam pelo evento 'stream-error'.
+   * Guarda contra chamadas concorrentes: se já houver stream ativo, fecha antes.
    */
   async openStream() {
+    // Guard: prevent concurrent streams
+    if (this._streamGuard.active) {
+      this.closeStream();
+      // Small delay to ensure cleanup
+      await new Promise(r => setTimeout(r, 50));
+    }
+    this._streamGuard.active = true;
+    
     this.closeStream();
     const controller = new AbortController();
     this.streamAbort = controller;
 
     const run = async () => {
-      while (!controller.signal.aborted) {
-        try {
-          const res = await fetch(`${this.base}/api/event`, {
-            headers: { Authorization: this.authHeader(), Accept: 'text/event-stream' },
-            signal: controller.signal
-          });
-          if (!res.ok || !res.body) throw new Error(`SSE HTTP ${res.status}`);
-          this.connected = true;
-          this.emit('stream-open', {});
+      try {
+        while (!controller.signal.aborted) {
+          try {
+            const res = await fetch(`${this.base}/api/event`, {
+              headers: { Authorization: this.authHeader(), Accept: 'text/event-stream' },
+              signal: controller.signal
+            });
+            if (!res.ok || !res.body) throw new Error(`SSE HTTP ${res.status}`);
+            this.connected = true;
+            this.emit('stream-open', {});
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buf = '';
-          for (;;) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            let idx;
-            while ((idx = buf.indexOf('\n\n')) >= 0) {
-              const chunk = buf.slice(0, idx);
-              buf = buf.slice(idx + 2);
-              for (const line of chunk.split('\n')) {
-                if (!line.startsWith('data:')) continue;
-                const raw = line.slice(5).trim();
-                if (!raw) continue;
-                try {
-                  const evt = JSON.parse(raw);
-                  this.emit('event', evt);
-                } catch { /* heartbeat ou frame inválido */ }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              let idx;
+              while ((idx = buf.indexOf('\n\n')) >= 0) {
+                const chunk = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                for (const line of chunk.split('\n')) {
+                  if (!line.startsWith('data:')) continue;
+                  const raw = line.slice(5).trim();
+                  if (!raw) continue;
+                  try {
+                    const evt = JSON.parse(raw);
+                    this.emit('event', evt);
+                  } catch { /* heartbeat ou frame inválido */ }
+                }
               }
             }
+          } catch (err) {
+            if (controller.signal.aborted) return;
+            this.connected = false;
+            this.emit('stream-error', { error: err });
+            await new Promise((r) => setTimeout(r, 2000));
           }
-        } catch (err) {
-          if (controller.signal.aborted) return;
-          this.connected = false;
-          this.emit('stream-error', { error: err });
-          await new Promise((r) => setTimeout(r, 2000));
         }
+      } finally {
+        this._streamGuard.active = false;
       }
     };
     this.stream = run();
@@ -303,6 +347,7 @@ export class OpencodeClient extends EventTarget {
     this.streamAbort = null;
     this.stream = null;
     this.connected = false;
+    this._streamGuard.active = false;
   }
 }
 

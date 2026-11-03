@@ -8,10 +8,11 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const BRAVE = 'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe';
-const EXT = process.argv[2];
+// caminho absoluto: o Chromium ignora --load-extension relativo em silêncio
+const EXT = resolve(process.argv[2] || 'extension');
 const OUT = process.argv[3] || join(process.cwd(), 'shots-novo');
 const API = 'http://127.0.0.1:4177';
 const PW = 'testefixo123';
@@ -36,15 +37,18 @@ const sess = await (await fetch(`${API}/api/session`, {
 const SID = sess.data.id;
 console.log('sessão limpa:', SID);
 
-// página com uma marca visual grande, para provar que a captura pegou a tela
+// página com uma marca visual grande, para provar que a captura pegou a tela.
+// As faixas são baixas de propósito: captureVisibleTab fotografa só o
+// viewport, então conteúdo que não cabe na janela simplesmente não aparece
+// na captura — e o teste mediria zero sem que a extensão tivesse culpa.
 const HTML = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Alvo</title>
-<style>body{font:16px system-ui;padding:50px;background:#fff;color:#111;margin:0}
-h1{font-size:32px}
-.faixa{height:340px;background:#1d4ed8;color:#fff;display:grid;place-items:center;
+<style>body{font:16px system-ui;padding:24px;background:#fff;color:#111;margin:0}
+h1{font-size:26px;margin:0 0 8px}
+.faixa{height:190px;background:#1d4ed8;color:#fff;display:grid;place-items:center;
 font:800 40px system-ui;border-radius:8px;margin:18px 0}
-.vermelho{height:340px;background:#dc2626;color:#fff;display:grid;place-items:center;
+.vermelho{height:190px;background:#dc2626;color:#fff;display:grid;place-items:center;
 font:800 40px system-ui;border-radius:8px;margin:18px 0}
-p{font:700 26px system-ui;color:#111}</style></head><body>
+p{font:700 20px system-ui;color:#111;margin:0 0 4px}</style></head><body>
 <h1>Página para a captura</h1>
 <p>MARCA-TEXTO-ALPHA</p>
 <div class="faixa">FAIXA AZUL</div>
@@ -96,8 +100,13 @@ function attach(url) {
   };
   const mouse = (type, x, y, extra = {}) =>
     send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1, ...extra });
+  // screenshot é acessório: em janela sem foco o captureScreenshot trava e
+  // nunca resolve, o que segura o teste inteiro. Prazo curto e segue sem foto.
   const shot = async (name) => {
-    const r = await send('Page.captureScreenshot', { format: 'png' });
+    const r = await Promise.race([
+      send('Page.captureScreenshot', { format: 'png' }),
+      new Promise((res) => setTimeout(() => res({}), 8000))
+    ]);
     if (r.result?.data) writeFileSync(join(OUT, name), Buffer.from(r.result.data, 'base64'));
   };
   return { ws, ready, send, evaluate, errors, mouse, shot };
@@ -109,6 +118,22 @@ await P.send('Runtime.enable');
 await P.send('Page.enable');
 await P.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 820, deviceScaleFactor: 1, mobile: false });
 await sleep(3000);
+
+// o install da extensão abre options.html numa aba nova, e ela fica ATIVA.
+// captureVisibleTab fotografa a aba ativa da janela — sem fechar esta, o
+// print do "ver tela" sai da página de opções, não da página de teste.
+{
+  const r = await P.send('Target.getTargets');
+  const opt = (r.result?.targetInfos || []).find((t) => /options\.html/.test(t.url));
+  if (opt) {
+    await P.send('Target.closeTarget', { targetId: opt.targetId }).catch(() => {});
+    await sleep(1200);
+    // devolve o foco para a aba do teste
+    await P.send('Page.bringToFront').catch(() => {});
+    await sleep(600);
+    console.log('  aba de opções fechada (seria a aba capturada)');
+  }
+}
 
 // ============================================ A. drag
 console.log('\n== A. arraste ==');
@@ -222,10 +247,16 @@ add('é JPEG em data URL', String(cap.prefix || '').startsWith('data:image/jpeg'
 
 await Q.shot('tela-anexada.png');
 
+// img.decode() pode rejeitar (ou nunca assentar) com data URL grande em
+// página de extensão — é o mesmo motivo de o painel usar onload em
+// shrinkImage(). Aqui basta esperar o naturalWidth existir.
 const pixels = await Q.evaluate(`(async () => {
   const img = document.querySelector('#attachments img');
   if (!img) return null;
-  await img.decode();
+  for (let i = 0; i < 60 && !img.naturalWidth; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!img.naturalWidth) return null;
   const c = document.createElement('canvas');
   c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d');
@@ -282,9 +313,13 @@ console.log('  servidor recebeu:', JSON.stringify(raw).slice(0, 320));
 add('o servidor recebeu a instrução interna', /CONFIG_OC/.test(raw) && /minhas-skills-unificadas/.test(raw), '');
 add('a instrução vem antes do pedido do usuário',
   raw.indexOf('CONFIG_OC') >= 0 && raw.indexOf('CONFIG_OC') < raw.indexOf('O que voce ve'), '');
+// o servidor guarda `agents` no TOPO da mensagem projetada, não em
+// `payload.agents` (medido contra o servidor real: a resposta do prompt já
+// traz `payload.agents`, mas o histórico projetado traz `agents`)
+const agentes = firstUser?.agents || firstUser?.payload?.agents || [];
 add('o roteador veio anexado como skill',
-  (firstUser?.payload?.agents || []).some((a) => a.name === 'minhas-skills-unificadas'),
-  JSON.stringify(firstUser?.payload?.agents || []));
+  agentes.some((a) => a.name === 'minhas-skills-unificadas'),
+  JSON.stringify(agentes));
 
 let waited = 0;
 while (waited < 60000) {
